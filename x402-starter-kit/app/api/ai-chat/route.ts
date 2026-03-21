@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "Message is required" }, { status: 400 });
     }
 
-    const paymentData = request.headers.get("x-payment");
+    const paymentData = request.headers.get("x-payment") || request.headers.get("payment-signature");
     const resourceUrl = new URL(request.url).href;
 
     // STEP 1: If no payment, return 402 with MAX price ($0.50) upfront

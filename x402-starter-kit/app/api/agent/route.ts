@@ -89,7 +89,7 @@ export async function POST(request: Request) {
     }
 
     const serviceCost = AGENT_AUTHORIZATION.SERVICE_COST;
-    const paymentData = request.headers.get("x-payment");
+    const paymentData = request.headers.get("x-payment") || request.headers.get("payment-signature");
     const resourceUrl = new URL(request.url).href;
 
     // STEP 1: If no payment, return 402 to trigger x402 flow

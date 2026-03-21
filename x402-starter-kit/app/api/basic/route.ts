@@ -13,7 +13,7 @@ const thirdwebFacilitator = facilitator({
 });
 
 export async function GET(request: Request) {
-  const paymentData = request.headers.get("x-payment");
+  const paymentData = request.headers.get("x-payment") || request.headers.get("payment-signature");
   const resourceUrl = new URL(request.url).href;
 
   console.log("=== SETTLEMENT DEBUG ===");

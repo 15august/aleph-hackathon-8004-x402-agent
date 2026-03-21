@@ -6,6 +6,7 @@ import { ConnectButton, useActiveWallet } from "thirdweb/react";
 import { wrapFetchWithPayment } from "thirdweb/x402";
 import { TransactionLog, LogEntry } from "@/components/transaction-log";
 import { SearchResults } from "@/components/search-results";
+import { SearchProgress } from "@/components/search-progress";
 import { Button } from "@/components/ui/button";
 import { createNormalizedFetch } from "@/lib/payment";
 import { AVALANCHE_FUJI_CHAIN_ID } from "@/lib/constants";
@@ -16,6 +17,12 @@ const client = createThirdwebClient({
 
 const SEARCH_PRICE_BIGINT = BigInt(10000); // $0.01 USDC
 
+interface JobStep {
+  step: string;
+  done: boolean;
+  detail?: string;
+}
+
 export default function Home() {
   const wallet = useActiveWallet();
   const [query, setQuery] = useState("");
@@ -24,6 +31,8 @@ export default function Home() {
   const [isPolling, setIsPolling] = useState(false);
   const [results, setResults] = useState<unknown[] | null>(null);
   const [searchedQuery, setSearchedQuery] = useState("");
+  const [steps, setSteps] = useState<JobStep[]>([]);
+  const [jobStatus, setJobStatus] = useState("");
 
   const addLog = (message: string, type: LogEntry["type"], extra?: Pick<LogEntry, "txHash" | "amount">) => {
     setLogs((prev) => [...prev, { message, type, timestamp: new Date(), ...extra }]);
@@ -42,23 +51,30 @@ export default function Home() {
     setIsPolling(true);
     addLog("Searching properties...", "info");
 
-    const maxAttempts = 30;
+    const maxAttempts = 90; // 3 minutes
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise((r) => setTimeout(r, 2000));
       try {
         const res = await fetch(`/api/search/${jobId}`);
         const data = await res.json();
 
-        if (data.status === "completed" || data.results || data.listings || data.properties) {
-          const items = data.results || data.listings || data.properties || [];
+        if (data.steps) {
+          setSteps(data.steps as JobStep[]);
+        }
+        if (data.status) {
+          setJobStatus(data.status);
+        }
+
+        if (data.status === "done" || data.status === "completed") {
+          const result = data.result as { properties?: unknown[] } | undefined;
+          const items = (result?.properties || data.results || data.listings || data.properties || []) as unknown[];
           updateLastLog("success", `Found ${items.length} result${items.length !== 1 ? "s" : ""}`);
           setResults(items);
           break;
         } else if (data.status === "failed" || data.error) {
-          updateLastLog("error", `Search failed: ${data.error || "unknown error"}`);
+          updateLastLog("error", `Search failed: ${String(data.error || "unknown error")}`);
           break;
         }
-        // still pending, continue polling
       } catch {
         // network error, retry
       }
@@ -72,6 +88,8 @@ export default function Home() {
     setIsSearching(true);
     setResults(null);
     setLogs([]);
+    setSteps([]);
+    setJobStatus("");
     setSearchedQuery(query.trim());
 
     try {
@@ -149,8 +167,20 @@ export default function Home() {
       <div className="max-w-3xl mx-auto space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold">Property Search</h1>
+          <h1 className="text-4xl font-bold">Property Search via x402</h1>
           <p className="text-muted-foreground">AI-powered apartment search · $0.01 USDC per query</p>
+          <p className="text-sm text-muted-foreground">
+            Powered by{" "}
+            <a
+              href="https://ai-agent-property.vercel.app/"
+              className="text-blue-600 hover:underline"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              ai-agent-property.vercel.app
+            </a>
+          </p>
+          <p className="text-sm text-muted-foreground">Aleph Hackathon · Avalanche track</p>
           <div className="flex items-center justify-center gap-2 pt-2">
             <ConnectButton client={client} />
           </div>
@@ -196,6 +226,11 @@ export default function Home() {
 
         {/* Transaction Log */}
         {logs.length > 0 && <TransactionLog logs={logs} />}
+
+        {/* Steps progress */}
+        {steps.length > 0 && (isPolling || jobStatus === "completed") && (
+          <SearchProgress steps={steps} status={jobStatus} />
+        )}
 
         {/* Results */}
         {(results !== null || isPolling) && (

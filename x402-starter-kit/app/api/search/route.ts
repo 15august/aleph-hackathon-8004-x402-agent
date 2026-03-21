@@ -3,7 +3,7 @@ import { createThirdwebClient } from "thirdweb";
 import { avalancheFuji } from "thirdweb/chains";
 import { USDC_FUJI_ADDRESS } from "@/lib/constants";
 
-const BACKEND_URL = "https://ai-agent-property.vercel.app";
+const BACKEND_URL = "https://ai-agent-property-production.up.railway.app";
 
 const client = createThirdwebClient({
   secretKey: process.env.THIRDWEB_SECRET_KEY!,
@@ -15,7 +15,7 @@ const thirdwebFacilitator = facilitator({
 });
 
 export async function GET(request: Request) {
-  const paymentData = request.headers.get("x-payment");
+  const paymentData = request.headers.get("x-payment") || request.headers.get("payment-signature");
   const url = new URL(request.url);
   const resourceUrl = url.href;
   const query = url.searchParams.get("q") || "2 ambientes en Palermo";

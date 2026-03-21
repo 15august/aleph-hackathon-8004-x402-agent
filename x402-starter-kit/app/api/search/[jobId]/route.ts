@@ -1,4 +1,4 @@
-const BACKEND_URL = "https://ai-agent-property.vercel.app";
+const BACKEND_URL = "https://ai-agent-property-production.up.railway.app";
 
 export async function GET(
   request: Request,
