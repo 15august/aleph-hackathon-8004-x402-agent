@@ -3,6 +3,8 @@ import { createThirdwebClient } from "thirdweb";
 import { avalancheFuji } from "thirdweb/chains";
 import { USDC_FUJI_ADDRESS } from "@/lib/constants";
 
+const BACKEND_URL = "https://ai-agent-property.vercel.app";
+
 const client = createThirdwebClient({
   secretKey: process.env.THIRDWEB_SECRET_KEY!,
 });
@@ -32,54 +34,21 @@ export async function POST(request: Request) {
   });
 
   if (result.status === 200) {
-    // Parse the search query from request body
-    let query = "default search";
+    // Payment accepted — forward query to Dev 1 backend
+    let query = "2 ambientes en Palermo";
     try {
       const body = await request.json();
       query = body.query || query;
     } catch {}
 
-    // Mock response matching Dev 1's format
-    return Response.json({
-      status: "done",
-      result: {
-        properties: [
-          {
-            title: "2BR Palermo Soho - Luminoso",
-            price: 750,
-            currency: "USD",
-            neighborhood: "Palermo",
-            rooms: 2,
-            matchScore: 92,
-            image: "https://placehold.co/400x300?text=Palermo+Soho",
-          },
-          {
-            title: "1BR Recoleta - Centro",
-            price: 600,
-            currency: "USD",
-            neighborhood: "Recoleta",
-            rooms: 1,
-            matchScore: 78,
-            image: "https://placehold.co/400x300?text=Recoleta",
-          },
-          {
-            title: "3BR Belgrano - Cerca Subte",
-            price: 900,
-            currency: "USD",
-            neighborhood: "Belgrano",
-            rooms: 3,
-            matchScore: 65,
-            image: "https://placehold.co/400x300?text=Belgrano",
-          },
-        ],
-        metadata: {
-          query,
-          totalResults: 3,
-          searchTime: "1.2s",
-          timestamp: new Date().toISOString(),
-        },
-      },
+    const backendResponse = await fetch(`${BACKEND_URL}/api/search`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query }),
     });
+
+    const data = await backendResponse.json();
+    return Response.json(data, { status: backendResponse.status });
   } else {
     return Response.json(result.responseBody, {
       status: result.status,
