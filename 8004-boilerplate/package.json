@@ -1,0 +1,36 @@
+{
+  "name": "erc8004-agent-boilerplate",
+  "version": "1.0.0",
+  "description": "ERC-8004 AI Agent Boilerplate - Deploy agents with on-chain identity, reputation & validation",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:fuji": "hardhat run scripts/deploy.js --network fuji",
+    "deploy:avalanche": "hardhat run scripts/deploy.js --network avalanche",
+    "deploy:local": "hardhat run scripts/deploy.js --network localhost",
+    "node": "hardhat node",
+    "cli:status": "COMMAND=status hardhat run scripts/agent-cli.js --network fuji",
+    "cli:tasks": "COMMAND=tasks hardhat run scripts/agent-cli.js --network fuji",
+    "cli:feedback": "COMMAND=feedback hardhat run scripts/agent-cli.js --network fuji",
+    "cli:withdraw": "COMMAND=withdraw hardhat run scripts/agent-cli.js --network fuji",
+    "backend": "cd agent-backend && npm start",
+    "frontend": "cd frontend && python3 -m http.server 3003"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@openzeppelin/contracts": "^5.0.0",
+    "@openzeppelin/contracts-upgradeable": "^5.0.0",
+    "dotenv": "^17.2.3",
+    "hardhat": "^2.19.0"
+  },
+  "keywords": [
+    "erc8004",
+    "ai-agent",
+    "ethereum",
+    "avalanche",
+    "reputation",
+    "identity",
+    "web3"
+  ],
+  "license": "MIT"
+}

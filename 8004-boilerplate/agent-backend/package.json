@@ -1,0 +1,14 @@
+{
+  "name": "erc8004-agent-backend",
+  "version": "1.0.0",
+  "description": "Backend service for ERC-8004 AI Agent",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "ethers": "^6.9.0",
+    "dotenv": "^16.3.1"
+  }
+}
