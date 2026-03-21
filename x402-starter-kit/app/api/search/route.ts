@@ -68,7 +68,9 @@ export async function GET(request: Request) {
       },
     }, { status: backendResponse.status });
   } else {
-    console.log("[search] payment failed, status:", result.status, "body:", JSON.stringify(result.responseBody));
+    console.log("[search] payment failed, status:", result.status);
+    console.log("[search] responseBody:", JSON.stringify(result.responseBody));
+    console.log("[search] responseHeaders:", JSON.stringify(result.responseHeaders));
     return Response.json(result.responseBody, {
       status: result.status,
       headers: result.responseHeaders,

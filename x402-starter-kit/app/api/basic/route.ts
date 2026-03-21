@@ -41,6 +41,10 @@ export async function GET(request: Request) {
   console.log("status:", result.status);
 
 
+  if (result.status !== 200) {
+    console.log("[basic] 402 responseBody:", JSON.stringify(result.responseBody));
+    console.log("[basic] 402 responseHeaders:", JSON.stringify(result.responseHeaders));
+  }
   if (result.status === 200) {
     return Response.json({
       tier: "basic",
