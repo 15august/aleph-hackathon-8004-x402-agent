@@ -48,7 +48,14 @@ export async function POST(request: Request) {
     });
 
     const data = await backendResponse.json();
-    return Response.json(data, { status: backendResponse.status });
+    return Response.json({
+      ...data,
+      payment: {
+        transaction: result.paymentReceipt.transaction,
+        network: result.paymentReceipt.network,
+        payer: result.paymentReceipt.payer,
+      },
+    }, { status: backendResponse.status });
   } else {
     return Response.json(result.responseBody, {
       status: result.status,

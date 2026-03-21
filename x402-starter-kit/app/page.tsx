@@ -1,98 +1,124 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { createThirdwebClient } from "thirdweb";
-import { ConnectButton, useActiveWallet, useActiveAccount } from "thirdweb/react";
+import { ConnectButton, useActiveWallet } from "thirdweb/react";
 import { wrapFetchWithPayment } from "thirdweb/x402";
-import { PaymentCard } from "@/components/payment-card";
-import { ContentDisplay } from "@/components/content-display";
 import { TransactionLog, LogEntry } from "@/components/transaction-log";
-import { ModeNavigation, PaymentMode } from "@/components/mode-navigation";
-import { ScenarioNavigation, AIScenario } from "@/components/scenario-navigation";
-import { ChatInterface } from "@/components/ai-chat/chat-interface";
-import { AgentDashboard } from "@/components/agent/agent-dashboard";
-import { Separator } from "@/components/ui/separator";
+import { SearchResults } from "@/components/search-results";
+import { Button } from "@/components/ui/button";
 import { createNormalizedFetch } from "@/lib/payment";
-import { AVALANCHE_FUJI_CHAIN_ID, PAYMENT_AMOUNTS, API_ENDPOINTS } from "@/lib/constants";
+import { AVALANCHE_FUJI_CHAIN_ID } from "@/lib/constants";
 
 const client = createThirdwebClient({
   clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID!,
 });
 
-interface ContentData {
-  tier: string;
-  data: string;
-  features?: string[];
-  timestamp: string;
-}
+const SEARCH_PRICE_BIGINT = BigInt(10000); // $0.01 USDC
 
 export default function Home() {
   const wallet = useActiveWallet();
-  const account = useActiveAccount();
-  const [content, setContent] = useState<ContentData | null>(null);
+  const [query, setQuery] = useState("");
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [isPaying, setIsPaying] = useState(false);
-  const [mode, setMode] = useState<PaymentMode>("human");
-  const [aiScenario, setAIScenario] = useState<AIScenario>("token-chat");
+  const [isSearching, setIsSearching] = useState(false);
+  const [isPolling, setIsPolling] = useState(false);
+  const [results, setResults] = useState<unknown[] | null>(null);
+  const [searchedQuery, setSearchedQuery] = useState("");
 
-  useEffect(() => {
-    setLogs([]);
-    setContent(null);
-  }, [wallet, account?.address]);
-
-  const addLog = (message: string, type: LogEntry["type"]) => {
-    setLogs((prev) => [...prev, { message, type, timestamp: new Date() }]);
+  const addLog = (message: string, type: LogEntry["type"], extra?: Pick<LogEntry, "txHash" | "amount">) => {
+    setLogs((prev) => [...prev, { message, type, timestamp: new Date(), ...extra }]);
   };
 
-  const updateLogStatus = (messagePattern: string, newType: LogEntry["type"]) => {
-    setLogs((prev) =>
-      prev.map((log) =>
-        log.message.includes(messagePattern) ? { ...log, type: newType } : log
-      )
-    );
+  const updateLastLog = (type: LogEntry["type"], message?: string) => {
+    setLogs((prev) => {
+      if (!prev.length) return prev;
+      const last = { ...prev[prev.length - 1], type };
+      if (message) last.message = message;
+      return [...prev.slice(0, -1), last];
+    });
   };
 
-  const handlePayment = async (tier: "basic" | "premium") => {
-    if (!wallet) return;
+  const pollJob = async (jobId: string) => {
+    setIsPolling(true);
+    addLog("Searching properties...", "info");
 
-    setIsPaying(true);
-    setContent(null);
+    const maxAttempts = 30;
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      try {
+        const res = await fetch(`/api/search/${jobId}`);
+        const data = await res.json();
+
+        if (data.status === "completed" || data.results || data.listings || data.properties) {
+          const items = data.results || data.listings || data.properties || [];
+          updateLastLog("success", `Found ${items.length} result${items.length !== 1 ? "s" : ""}`);
+          setResults(items);
+          break;
+        } else if (data.status === "failed" || data.error) {
+          updateLastLog("error", `Search failed: ${data.error || "unknown error"}`);
+          break;
+        }
+        // still pending, continue polling
+      } catch {
+        // network error, retry
+      }
+    }
+    setIsPolling(false);
+  };
+
+  const handleSearch = async () => {
+    if (!wallet || !query.trim()) return;
+
+    setIsSearching(true);
+    setResults(null);
     setLogs([]);
+    setSearchedQuery(query.trim());
 
     try {
-      addLog(`Initiating ${tier} payment...`, "info");
+      addLog("Requesting payment authorization...", "info");
 
       const normalizedFetch = createNormalizedFetch(AVALANCHE_FUJI_CHAIN_ID);
-      const fetchWithPay = wrapFetchWithPayment(
-        normalizedFetch,
-        client,
-        wallet,
-        { maxValue: tier === "basic" ? PAYMENT_AMOUNTS.BASIC.bigInt : PAYMENT_AMOUNTS.PREMIUM.bigInt }
-      );
+      const fetchWithPay = wrapFetchWithPayment(normalizedFetch, client, wallet, {
+        maxValue: SEARCH_PRICE_BIGINT,
+      });
 
-      addLog("Requesting payment authorization...", "info");
-      const response = await fetchWithPay(tier === "basic" ? API_ENDPOINTS.BASIC : API_ENDPOINTS.PREMIUM);
-      const responseData = await response.json();
+      const response = await fetchWithPay("/api/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: query.trim() }),
+      });
 
-      if (response.status === 200) {
-        updateLogStatus("Initiating", "success");
-        updateLogStatus("Requesting payment authorization", "success");
-        addLog("Payment successful!", "success");
-        addLog("Content received", "success");
-        setContent(responseData);
+      const data = await response.json();
+
+      if (!response.ok) {
+        updateLastLog("error", "Payment failed");
+        addLog(data.error || "Search request failed", "error");
+        return;
+      }
+
+      updateLastLog("success", "Payment settled");
+      if (data.payment?.transaction) {
+        addLog("Transaction confirmed", "success", {
+          txHash: data.payment.transaction,
+          amount: "$0.01 USDC",
+        });
+      }
+
+      const jobId = data.jobId || data.job_id || data.id;
+      if (jobId) {
+        await pollJob(String(jobId));
+      } else if (data.results || data.listings || data.properties) {
+        const items = data.results || data.listings || data.properties || [];
+        addLog(`Found ${items.length} result${items.length !== 1 ? "s" : ""}`, "success");
+        setResults(items);
       } else {
-        updateLogStatus("Initiating", "error");
-        updateLogStatus("Requesting payment authorization", "error");
-        const errorMsg = responseData.error || "Unknown error";
-        addLog(`Payment failed: ${errorMsg}`, "error");
+        addLog("No results returned", "error");
       }
     } catch (error) {
-      updateLogStatus("Initiating", "error");
-      updateLogStatus("Requesting payment authorization", "error");
-      const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      addLog(`Error: ${errorMsg}`, "error");
+      updateLastLog("error");
+      addLog(error instanceof Error ? error.message : "Unknown error", "error");
     } finally {
-      setIsPaying(false);
+      setIsSearching(false);
     }
   };
 
@@ -101,8 +127,8 @@ export default function Home() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
         <div className="text-center space-y-6 p-8">
           <div>
-            <h1 className="text-4xl font-bold mb-2">x402 Starter Kit</h1>
-            <p className="text-muted-foreground">HTTP 402 Payment Protocol Demo</p>
+            <h1 className="text-4xl font-bold mb-2">Property Search</h1>
+            <p className="text-muted-foreground">Pay $0.01 USDC per search via x402</p>
             <p className="text-sm text-muted-foreground mt-1">Avalanche Fuji Testnet</p>
           </div>
           <ConnectButton client={client} />
@@ -113,99 +139,64 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="max-w-3xl mx-auto space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold">x402 Payment Demo</h1>
-          <p className="text-muted-foreground">HTTP 402 Payment Protocol</p>
+          <h1 className="text-4xl font-bold">Property Search</h1>
+          <p className="text-muted-foreground">AI-powered apartment search · $0.01 USDC per query</p>
           <div className="flex items-center justify-center gap-2 pt-2">
             <ConnectButton client={client} />
           </div>
         </div>
 
-        {/* Mode Navigation */}
-        <ModeNavigation activeMode={mode} onModeChange={setMode} />
-
-        <Separator />
-
-        {/* Human Payment Mode */}
-        {mode === "human" && (
-          <>
-            <div className="text-center">
-              <p className="text-muted-foreground">Choose a payment tier to unlock content</p>
-            </div>
-            
-            <div className="flex flex-wrap justify-between gap-6 max-w-4xl mx-auto">
-              <PaymentCard
-                tier="Basic"
-                price="$0.01"
-                description="Perfect for trying out the payment system"
-                onPayClick={() => handlePayment("basic")}
-                isPaying={isPaying}
-              />
-              <PaymentCard
-                tier="Premium"
-                price="$0.15"
-                description="Full access to all advanced features"
-                onPayClick={() => handlePayment("premium")}
-                isPaying={isPaying}
-              />
-            </div>
-
-            {content && (
-              <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <ContentDisplay
-                  tier={content.tier}
-                  data={content.data}
-                  features={content.features}
-                  timestamp={content.timestamp}
-                />
-              </div>
-            )}
-
-            {logs.length > 0 && (
-              <div className="max-w-4xl mx-auto animate-in fade-in-from-bottom-4 duration-700">
-                <TransactionLog logs={logs} />
-              </div>
-            )}
-          </>
-        )}
-
-        {/* AI Agent Mode */}
-        {mode === "ai-agent" && (
-          <div className="space-y-6">
-            {/* Scenario Navigation */}
-            <ScenarioNavigation 
-              activeScenario={aiScenario} 
-              onScenarioChange={setAIScenario} 
+        {/* Search Form */}
+        <div className="bg-white rounded-xl shadow-sm border p-6 space-y-4">
+          <label className="block text-sm font-medium text-gray-700">
+            What are you looking for?
+          </label>
+          <div className="flex gap-3">
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !isSearching && !isPolling && handleSearch()}
+              placeholder="2 ambientes en Palermo, Buenos Aires"
+              className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={isSearching || isPolling}
             />
-
-            {/* Token-Based Chat */}
-            {aiScenario === "token-chat" && (
-              <div className="space-y-4">
-                <div className="text-center">
-                  <h2 className="text-xl font-semibold">Token-Based AI Chat</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Pay per message based on actual token usage
-                  </p>
-                </div>
-                <ChatInterface />
-              </div>
-            )}
-
-            {/* Autonomous Agents */}
-            {aiScenario === "autonomous-agents" && (
-              <div className="space-y-4">
-                <div className="text-center">
-                  <h2 className="text-xl font-semibold">Autonomous AI Agent</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Pre-authorize a budget, agent pays automatically
-                  </p>
-                </div>
-                <AgentDashboard />
-              </div>
-            )}
+            <Button
+              onClick={handleSearch}
+              disabled={isSearching || isPolling || !query.trim()}
+              className="shrink-0"
+            >
+              {isSearching || isPolling ? (
+                <span className="flex items-center gap-2">
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Searching...
+                </span>
+              ) : (
+                "Search — $0.01 USDC"
+              )}
+            </Button>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Each search costs $0.01 USDC paid via x402 protocol on Avalanche Fuji Testnet
+          </p>
+        </div>
+
+        {/* Transaction Log */}
+        {logs.length > 0 && <TransactionLog logs={logs} />}
+
+        {/* Results */}
+        {(results !== null || isPolling) && (
+          <SearchResults
+            results={results}
+            isLoading={isPolling}
+            query={searchedQuery}
+          />
         )}
       </div>
     </div>

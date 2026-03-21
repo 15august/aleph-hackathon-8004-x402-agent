@@ -5,6 +5,8 @@ export interface LogEntry {
   message: string;
   type: "info" | "success" | "error";
   timestamp: Date;
+  txHash?: string;
+  amount?: string;
 }
 
 interface TransactionLogProps {
@@ -51,7 +53,24 @@ export function TransactionLog({ logs }: TransactionLogProps) {
                 <div key={index} className="flex items-start gap-3">
                   <div className="mt-0.5">{getIcon(log.type)}</div>
                   <div className="flex-1">
-                    <p className="text-sm">{log.message}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm">{log.message}</p>
+                      {log.amount && (
+                        <span className="text-xs font-medium bg-green-50 text-green-700 border border-green-200 rounded px-1.5 py-0.5">
+                          {log.amount}
+                        </span>
+                      )}
+                    </div>
+                    {log.txHash && (
+                      <a
+                        href={`https://testnet.snowtrace.io/tx/${log.txHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:underline font-mono"
+                      >
+                        {log.txHash.slice(0, 6)}...{log.txHash.slice(-4)} ↗
+                      </a>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       {log.timestamp.toLocaleTimeString()}
                     </p>
