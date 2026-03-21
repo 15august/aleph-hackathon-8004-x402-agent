@@ -39,7 +39,7 @@ export async function GET(request: Request) {
 
   console.log("=== SETTLEMENT RESULT ===");
   console.log("status:", result.status);
-  console.log("responseBody:", JSON.stringify(result.responseBody));
+
 
   if (result.status === 200) {
     return Response.json({
