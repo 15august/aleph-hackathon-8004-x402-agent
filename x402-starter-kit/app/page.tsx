@@ -99,7 +99,8 @@ export default function Home() {
 
       if (!response.ok) {
         updateLastLog("error", "Payment failed");
-        addLog(String(data.error || "Search request failed"), "error");
+        const errMsg = String(data.errorMessage || data.error || `HTTP ${response.status}`);
+        addLog(`Payment error: ${errMsg}`, "error");
         return;
       }
 

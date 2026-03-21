@@ -18,6 +18,9 @@ export async function POST(request: Request) {
   const paymentData = request.headers.get("x-payment");
   const resourceUrl = new URL(request.url).href;
 
+  console.log("[search] paymentData present:", !!paymentData);
+  console.log("[search] resourceUrl:", resourceUrl);
+
   const result = await settlePayment({
     resourceUrl,
     method: "POST",
@@ -70,6 +73,7 @@ export async function POST(request: Request) {
       },
     }, { status: backendResponse.status });
   } else {
+    console.log("[search] payment failed, status:", result.status, "body:", JSON.stringify(result.responseBody));
     return Response.json(result.responseBody, {
       status: result.status,
       headers: result.responseHeaders,
