@@ -88,18 +88,26 @@ export default function Home() {
         body: JSON.stringify({ query: query.trim() }),
       });
 
-      const data = await response.json();
+      let data: Record<string, unknown> = {};
+      try {
+        data = await response.json();
+      } catch {
+        updateLastLog("error", "Payment failed");
+        addLog(`Server error (status ${response.status})`, "error");
+        return;
+      }
 
       if (!response.ok) {
         updateLastLog("error", "Payment failed");
-        addLog(data.error || "Search request failed", "error");
+        addLog(String(data.error || "Search request failed"), "error");
         return;
       }
 
       updateLastLog("success", "Payment settled");
-      if (data.payment?.transaction) {
+      const payment = data.payment as { transaction?: string; network?: string; payer?: string } | undefined;
+      if (payment?.transaction) {
         addLog("Transaction confirmed", "success", {
-          txHash: data.payment.transaction,
+          txHash: payment.transaction,
           amount: "$0.01 USDC",
         });
       }
@@ -107,12 +115,14 @@ export default function Home() {
       const jobId = data.jobId || data.job_id || data.id;
       if (jobId) {
         await pollJob(String(jobId));
-      } else if (data.results || data.listings || data.properties) {
-        const items = data.results || data.listings || data.properties || [];
-        addLog(`Found ${items.length} result${items.length !== 1 ? "s" : ""}`, "success");
-        setResults(items);
       } else {
-        addLog("No results returned", "error");
+        const items = (data.results || data.listings || data.properties) as unknown[] | undefined;
+        if (items && items.length > 0) {
+          addLog(`Found ${items.length} result${items.length !== 1 ? "s" : ""}`, "success");
+          setResults(items);
+        } else {
+          addLog("No results returned", "error");
+        }
       }
     } catch (error) {
       updateLastLog("error");

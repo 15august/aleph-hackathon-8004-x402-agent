@@ -47,7 +47,20 @@ export async function POST(request: Request) {
       body: JSON.stringify({ query }),
     });
 
-    const data = await backendResponse.json();
+    let data: Record<string, unknown> = {};
+    try {
+      data = await backendResponse.json();
+    } catch {
+      return Response.json({
+        error: `Backend returned non-JSON response (status ${backendResponse.status})`,
+        payment: {
+          transaction: result.paymentReceipt.transaction,
+          network: result.paymentReceipt.network,
+          payer: result.paymentReceipt.payer,
+        },
+      }, { status: 502 });
+    }
+
     return Response.json({
       ...data,
       payment: {
