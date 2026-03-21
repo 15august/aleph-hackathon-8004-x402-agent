@@ -5,7 +5,7 @@ export interface LogEntry {
   message: string;
   type: "info" | "success" | "error";
   timestamp: Date;
-  txHash?: string;
+  payer?: string;
   amount?: string;
 }
 
@@ -61,14 +61,14 @@ export function TransactionLog({ logs }: TransactionLogProps) {
                         </span>
                       )}
                     </div>
-                    {log.txHash && (
+                    {log.payer && (
                       <a
-                        href={`https://testnet.snowtrace.io/tx/${log.txHash}`}
+                        href={`https://testnet.snowtrace.io/address/${log.payer}?chainid=43113`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs text-blue-600 hover:underline font-mono"
                       >
-                        {log.txHash.slice(0, 6)}...{log.txHash.slice(-4)} ↗
+                        {log.payer.slice(0, 6)}...{log.payer.slice(-4)} ↗
                       </a>
                     )}
                     <p className="text-xs text-muted-foreground">

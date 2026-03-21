@@ -39,6 +39,7 @@ export async function GET(request: Request) {
   });
 
   if (result.status === 200) {
+    console.log("[search] paymentReceipt:", JSON.stringify(result.paymentReceipt));
     const backendResponse = await fetch(`${BACKEND_URL}/api/search`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

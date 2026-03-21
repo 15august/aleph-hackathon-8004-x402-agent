@@ -34,7 +34,7 @@ export default function Home() {
   const [steps, setSteps] = useState<JobStep[]>([]);
   const [jobStatus, setJobStatus] = useState("");
 
-  const addLog = (message: string, type: LogEntry["type"], extra?: Pick<LogEntry, "txHash" | "amount">) => {
+  const addLog = (message: string, type: LogEntry["type"], extra?: Pick<LogEntry, "payer" | "amount">) => {
     setLogs((prev) => [...prev, { message, type, timestamp: new Date(), ...extra }]);
   };
 
@@ -120,9 +120,9 @@ export default function Home() {
 
       updateLastLog("success", "Payment settled");
       const payment = data.payment as { transaction?: string; network?: string; payer?: string } | undefined;
-      if (payment?.transaction) {
+      if (payment?.payer) {
         addLog("Transaction confirmed", "success", {
-          txHash: payment.transaction,
+          payer: payment.payer,
           amount: "$0.01 USDC",
         });
       }
