@@ -14,16 +14,18 @@ const thirdwebFacilitator = facilitator({
   serverWalletAddress: process.env.THIRDWEB_SERVER_WALLET_ADDRESS!,
 });
 
-export async function POST(request: Request) {
+export async function GET(request: Request) {
   const paymentData = request.headers.get("x-payment");
-  const resourceUrl = new URL(request.url).href;
+  const url = new URL(request.url);
+  const resourceUrl = url.href;
+  const query = url.searchParams.get("q") || "2 ambientes en Palermo";
 
   console.log("[search] paymentData present:", !!paymentData);
-  console.log("[search] resourceUrl:", resourceUrl);
+  console.log("[search] query:", query);
 
   const result = await settlePayment({
     resourceUrl,
-    method: "POST",
+    method: "GET",
     paymentData,
     payTo: process.env.MERCHANT_WALLET_ADDRESS!,
     network: avalancheFuji,
@@ -37,13 +39,6 @@ export async function POST(request: Request) {
   });
 
   if (result.status === 200) {
-    // Payment accepted — forward query to Dev 1 backend
-    let query = "2 ambientes en Palermo";
-    try {
-      const body = await request.json();
-      query = body.query || query;
-    } catch {}
-
     const backendResponse = await fetch(`${BACKEND_URL}/api/search`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

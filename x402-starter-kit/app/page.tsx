@@ -82,11 +82,7 @@ export default function Home() {
         maxValue: SEARCH_PRICE_BIGINT,
       });
 
-      const response = await fetchWithPay("/api/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: query.trim() }),
-      });
+      const response = await fetchWithPay(`/api/search?q=${encodeURIComponent(query.trim())}`);
 
       let data: Record<string, unknown> = {};
       try {
